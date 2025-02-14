@@ -5,12 +5,36 @@ use walkdir::WalkDir;
 use exif::{Reader, In, Tag};
 use chrono::NaiveDateTime;
 use std::time::Instant;
+use indicatif::{ProgressBar, ProgressStyle};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start_time = Instant::now();
     
     // Create converted directory if it doesn't exist
     create_dir_all("converted")?;
+
+    // First count total files to process
+    let total_files = WalkDir::new(".")
+        .min_depth(1)
+        .max_depth(1)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            if let Some(ext) = e.path().extension() {
+                let ext = ext.to_string_lossy().to_lowercase();
+                ext == "jpg" || ext == "jpeg"
+            } else {
+                false
+            }
+        })
+        .count();
+
+    // Create progress bar
+    let pb = ProgressBar::new(total_files as u64);
+    pb.set_style(ProgressStyle::default_bar()
+        .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({percent}%)")
+        .unwrap()
+        .progress_chars("#>-"));
 
     let mut processed_count = 0;
     
@@ -25,12 +49,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                || extension.to_string_lossy().to_lowercase() == "jpeg" {
                 process_image(path)?;
                 processed_count += 1;
+                pb.inc(1);
             }
         }
     }
 
+    pb.finish_with_message("Processing complete");
+
     let elapsed = start_time.elapsed();
-    eprintln!("Processing completed successfully!");
+    eprintln!("\nProcessing completed successfully!");
     eprintln!("Total images processed: {}", processed_count);
     eprintln!("Total elapsed time: {:.2?}", elapsed);
     if processed_count > 0 {
@@ -47,7 +74,6 @@ fn process_image(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     
     // Try to read EXIF data and apply orientation
     if let Ok(file) = std::fs::File::open(path) {
-        eprintln!("Processing file: {}...", path.display());
         if let Ok(exif) = Reader::new().read_from_container(&mut std::io::BufReader::new(&file)) {
             // Apply EXIF orientation if available
             if let Some(orientation) = exif.get_field(Tag::Orientation, In::PRIMARY) {
@@ -132,12 +158,12 @@ fn process_image(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     // Generate filename with debug info
     let filename = match datetime {
         Some(dt) => {
-            println!("Using EXIF datetime: {}", dt);
+            //println!("Using EXIF datetime: {}", dt);
             dt.format("%Y%m%d_%H%M%S").to_string()
         }
         None => {
             let current = chrono::Local::now();
-            println!("Using current datetime: {}", current);
+            //println!("Using current datetime: {}", current);
             current.format("%Y%m%d_%H%M%S").to_string()
         }
     };

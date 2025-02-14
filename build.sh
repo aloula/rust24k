@@ -50,12 +50,12 @@ build_target() {
     fi
 }
 
-# Build for each target
-build_target "x86_64-apple-darwin" "rust24k"
-build_target "aarch64-apple-darwin" "rust24k"
-build_target "x86_64-unknown-linux-gnu" "rust24k"
-build_target "aarch64-unknown-linux-gnu" "rust24k"
-build_target "x86_64-pc-windows-gnu" "rust24k.exe"
+# Build for each target platform
+build_target "x86_64-apple-darwin" "rust24k"         # Intel Mac
+build_target "aarch64-apple-darwin" "rust24k"        # M1/M2 Mac
+build_target "x86_64-pc-windows-gnu" "rust24k.exe"   # Windows x64
+build_target "x86_64-unknown-linux-gnu" "rust24k"    # Linux x64
+build_target "aarch64-unknown-linux-gnu" "rust24k"   # Linux ARM64
 
 # Create zip archives for each build
 echo -e "${BLUE}Creating archives...${NC}"
