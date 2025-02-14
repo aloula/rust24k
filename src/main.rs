@@ -4,8 +4,11 @@ use std::path::Path;
 use walkdir::WalkDir;
 use exif::{Reader, In, Tag};
 use chrono::NaiveDateTime;
+use std::time::Instant;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let start_time = Instant::now();
+    
     // Create converted directory if it doesn't exist
     create_dir_all("converted")?;
 
@@ -26,8 +29,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
+    let elapsed = start_time.elapsed();
     eprintln!("Processing completed successfully!");
     eprintln!("Total images processed: {}", processed_count);
+    eprintln!("Total elapsed time: {:.2?}", elapsed);
+    if processed_count > 0 {
+        eprintln!("Average time per image: {:.2?}", elapsed / processed_count as u32);
+    }
     eprintln!("Output directory: {}", std::fs::canonicalize("converted")?.display());
     
     Ok(())
@@ -94,10 +102,14 @@ fn process_image(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         if let Ok(exif) = Reader::new().read_from_container(&mut std::io::BufReader::new(&file)) {
             if let Some(field) = exif.get_field(Tag::DateTime, In::PRIMARY) {
                 let display_value = field.display_value().to_string();
-                // Remove quotes if they exist
                 let datetime_str = display_value.trim_matches('"');
                 
-                match NaiveDateTime::parse_from_str(datetime_str, "%Y:%m:%d %H:%M:%S") {
+                // Try first with colons (YYYY:MM:DD)
+                let parsed_date = NaiveDateTime::parse_from_str(datetime_str, "%Y:%m:%d %H:%M:%S")
+                    // If that fails, try with dashes (YYYY-MM-DD)
+                    .or_else(|_| NaiveDateTime::parse_from_str(datetime_str, "%Y-%m-%d %H:%M:%S"));
+
+                match parsed_date {
                     Ok(dt) => Some(dt),
                     Err(e) => {
                         eprintln!("Error parsing datetime '{}': {}", datetime_str, e);
