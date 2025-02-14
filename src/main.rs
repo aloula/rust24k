@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if processed_count > 0 {
         eprintln!("Average time per image: {:.2?}", elapsed / processed_count as u32);
     }
-    eprintln!("Output directory: {}", std::fs::canonicalize("converted")?.display());
+    //eprintln!("Output directory: {}", std::fs::canonicalize("converted")?.display());
     
     Ok(())
 }
