@@ -54,6 +54,7 @@ build_target() {
 build_target "x86_64-apple-darwin" "rust24k"         # Intel Mac
 build_target "aarch64-apple-darwin" "rust24k"        # M1/M2 Mac
 build_target "x86_64-pc-windows-gnu" "rust24k.exe"   # Windows x64
+build_target "aarch64-pc-windows-msvc" "rust24k.exe" # Windows ARM64
 build_target "x86_64-unknown-linux-gnu" "rust24k"    # Linux x64
 build_target "aarch64-unknown-linux-gnu" "rust24k"   # Linux ARM64
 

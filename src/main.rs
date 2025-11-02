@@ -123,48 +123,37 @@ fn process_image(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
         i64::from(y_offset)
     );
     
-    // Get timestamp (with error handling)
-    let datetime = if let Ok(file) = std::fs::File::open(path) {
-        if let Ok(exif) = Reader::new().read_from_container(&mut std::io::BufReader::new(&file)) {
-            if let Some(field) = exif.get_field(Tag::DateTime, In::PRIMARY) {
-                let display_value = field.display_value().to_string();
-                let datetime_str = display_value.trim_matches('"');
-                
-                // Try first with colons (YYYY:MM:DD)
-                let parsed_date = NaiveDateTime::parse_from_str(datetime_str, "%Y:%m:%d %H:%M:%S")
-                    // If that fails, try with dashes (YYYY-MM-DD)
-                    .or_else(|_| NaiveDateTime::parse_from_str(datetime_str, "%Y-%m-%d %H:%M:%S"));
-
-                match parsed_date {
-                    Ok(dt) => Some(dt),
-                    Err(e) => {
-                        eprintln!("Error parsing datetime '{}': {}", datetime_str, e);
-                        None
-                    }
-                }
+    // Get timestamp from EXIF with enhanced error handling
+    let datetime = get_image_datetime(path);
+    
+    // If EXIF fails, use file modification time as fallback (NOT current time)
+    let datetime = datetime.or_else(|| {
+        if let Ok(metadata) = std::fs::metadata(path) {
+            if let Ok(modified) = metadata.modified() {
+                let system_time = std::time::UNIX_EPOCH + modified.duration_since(std::time::UNIX_EPOCH).ok()?;
+                let datetime: chrono::DateTime<chrono::Utc> = system_time.into();
+                Some(datetime.naive_utc())
             } else {
-                eprintln!("No DateTime field found in EXIF");
                 None
             }
         } else {
-            eprintln!("No EXIF data found");
             None
         }
-    } else {
-        eprintln!("Could not open file for EXIF reading");
-        None
-    };
+    });
     
-    // Generate filename with debug info
+    // Generate filename based on datetime or file modification time
     let filename = match datetime {
         Some(dt) => {
-            //println!("Using EXIF datetime: {}", dt);
+            println!("Using EXIF datetime: {}", dt);
             dt.format("%Y%m%d_%H%M%S").to_string()
         }
         None => {
-            let current = chrono::Local::now();
-            //println!("Using current datetime: {}", current);
-            current.format("%Y%m%d_%H%M%S").to_string()
+            // As absolute fallback, use original filename without extension
+            let stem = path.file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("unknown");
+            println!("No datetime available, using filename: {}", stem);
+            stem.to_string()
         }
     };
     
@@ -173,4 +162,47 @@ fn process_image(path: &Path) -> Result<(), Box<dyn std::error::Error>> {
     uhd_image.save(output_path)?;
     
     Ok(())
+}
+
+// Function to extract datetime from EXIF data
+fn get_image_datetime(path: &Path) -> Option<NaiveDateTime> {
+    let file = std::fs::File::open(path).ok()?;
+    let mut reader = std::io::BufReader::new(file);
+    let exif = Reader::new().read_from_container(&mut reader).ok()?;
+    
+    // Try multiple EXIF datetime fields in order of preference
+    let datetime_tags = [
+        Tag::DateTimeOriginal,  // When the photo was taken
+        Tag::DateTimeDigitized, // When the photo was digitized
+        Tag::DateTime,          // When the file was last modified
+    ];
+    
+    for &tag in &datetime_tags {
+        if let Some(field) = exif.get_field(tag, In::PRIMARY) {
+            let datetime_str = field.display_value().to_string();
+            let datetime_str = datetime_str.trim_matches('"');
+            
+            // Debug output (comentado para produção)
+            // println!("Found EXIF {:?}: '{}'", tag, datetime_str);
+            
+            // Try parsing with different formats
+            let formats = [
+                "%Y:%m:%d %H:%M:%S",  // Standard EXIF format
+                "%Y-%m-%d %H:%M:%S",  // Alternative format
+                "%Y/%m/%d %H:%M:%S",  // Another alternative
+            ];
+            
+            for format in &formats {
+                if let Ok(dt) = NaiveDateTime::parse_from_str(datetime_str, format) {
+                    // println!("Successfully parsed datetime: {}", dt);
+                    return Some(dt);
+                }
+            }
+            
+            // println!("Failed to parse datetime: '{}'", datetime_str);
+        }
+    }
+    
+    // println!("No valid EXIF datetime found in file: {}", path.display());
+    None
 }
