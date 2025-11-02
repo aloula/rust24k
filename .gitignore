@@ -60,11 +60,23 @@ criterion/
 target/criterion/
 
 # Project-specific output and artifacts
-/converted/           # Generated UHD images
+converted/           # Generated UHD images
 *.jpg                # Input/output JPEG files  
 *.jpeg               # Input/output JPEG files
 *.png                # Image files
 *.gif                # Image files
 *.webp               # Image files
 *.tiff               # Image files
+*.mp4                # Video files
+*.avi                # Video files
+*.mov                # Video files
+
+# Build artifacts and executables
+builds/              # Cross-compilation builds
+*.exe                # Windows executables
+*.zip                # Archive files
+*.tar.gz            # Archive files
+
+# Temporary files created by the program
+temp_image_list.txt  # FFmpeg input file list
 
